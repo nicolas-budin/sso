@@ -14,7 +14,9 @@ Navigateur ──> app Flask (localhost:5000) ──OIDC──> Keycloak (localh
   - Groupes : `ou=groups,dc=demo,dc=local` (objectClass `groupOfUniqueNames`, membres via `member`)
   - Compte de bind : `uid=admin,ou=people,dc=demo,dc=local`
 - **Keycloak** (26.x, mode `start-dev`) : realm `demo`, User Federation LDAP en READ_ONLY + `group-ldap-mapper`.
-  - Les groupes LDAP sont synchronisés dans Keycloak ; les **realm roles** (ex. `admin`) sont assignés aux groupes dans Keycloak.
+  - **Toute la configuration du realm est dans `keycloak/realm-demo.json`**, importé au démarrage (`--import-realm`). C'est la source de vérité : toute modification de config Keycloak doit y être reportée.
+  - L'import est ignoré si le realm existe déjà : pour réimporter, `docker compose down -v && docker compose up -d`.
+  - Les groupes LDAP sont synchronisés dans Keycloak ; les **realm roles** (ex. `admin`) sont assignés aux groupes dans Keycloak. Le groupe `informatique` est pré-créé dans le JSON avec le rôle `admin` ; le mapper LDAP le réutilise par son nom.
   - Clients : `test-cli` (public, direct access grants, tests curl) et `python-app` (confidentiel, standard flow).
   - Mapper "Group Membership" → claim `groups` (sans chemin complet) sur chaque client.
 - **app.py** : Flask + Authlib, flux authorization code. Routes : `/`, `/login`, `/callback`, `/protected`, `/admin` (exige le rôle `admin`), `/logout` (déconnexion SSO via `end_session_endpoint`).
@@ -22,14 +24,17 @@ Navigateur ──> app Flask (localhost:5000) ──OIDC──> Keycloak (localh
 ## Démarrage
 
 ```bash
-docker compose up -d
+docker compose up -d            # importe le realm demo automatiquement
+# créer alice/bob et les groupes informatique/rh dans lldap (http://localhost:17170)
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env    # puis renseigner KEYCLOAK_CLIENT_SECRET
+cp .env.example .env            # le secret de labo de python-app est déjà renseigné
 python app.py
 ```
 
-Variables d'environnement : `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET` (obligatoire), `FLASK_SECRET_KEY`.
+Variables d'environnement : `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET` (obligatoire, `python-app-secret-labo` en labo), `FLASK_SECRET_KEY`.
+
+Les utilisateurs LDAP sont importés dans Keycloak à leur première connexion ; pas besoin de lancer une synchronisation manuelle.
 
 ## Utilisateurs de test
 
@@ -45,7 +50,7 @@ Variables d'environnement : `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_I
 
 ## Pistes d'évolution
 
-- Exporter la config du realm (`kc.sh export`) et l'importer au démarrage (`--import-realm`) pour éviter la configuration manuelle.
+- Automatiser aussi la création des utilisateurs et groupes lldap (API GraphQL de lldap).
 - Ajouter une seconde appli pour démontrer le SSO entre deux applications.
 - Protéger une API par bearer token (validation du JWT via JWKS).
 - Variante Spring Boot (Spring Security en client OIDC).

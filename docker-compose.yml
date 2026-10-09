@@ -2,6 +2,9 @@
 # Lancement : docker compose up -d
 #   - lldap (UI web)   : http://localhost:17170  (admin / ChangeMe-ldap-2026)
 #   - Keycloak (admin) : http://localhost:8080   (admin / admin)
+# Le realm "demo" est importé automatiquement depuis keycloak/realm-demo.json
+# au premier démarrage (ignoré si le realm existe déjà).
+# Pour réimporter après modification du JSON : docker compose down -v && docker compose up -d
 # Usage local uniquement : changer tous les secrets avant toute autre utilisation.
 
 services:
@@ -24,7 +27,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: keycloak
-    command: start-dev
+    command: ["start-dev", "--import-realm"]
     ports:
       - "8080:8080"
     environment:
@@ -33,6 +36,7 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
     volumes:
       - keycloak_data:/opt/keycloak/data
+      - ./keycloak/realm-demo.json:/opt/keycloak/data/import/realm-demo.json:ro
     depends_on:
       - lldap
     restart: unless-stopped
